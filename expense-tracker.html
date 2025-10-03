@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Expense Dashboard</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    input, button { padding: 8px; margin: 5px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <h2>Expense Tracker Dashboard</h2>
+  <p>Enter your WhatsApp number (e.g., +9477xxxxxxx):</p>
+  <input type="text" id="userId" placeholder="+9477xxxxxxx">
+  <button onclick="loadData()">View My Expenses</button>
+
+  <h3>Your Expenses</h3>
+  <table id="expenseTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Description</th>
+        <th>Amount</th>
+        <th>Type</th>
+        <th>Category</th>
+        <th>Paid From</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>Monthly Expense Summary</h3>
+  <canvas id="expenseChart" width="400" height="200"></canvas>
+
+  <script>
+    // ===== Firebase Config =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyCVBouas1jAvQvpRMv7mlqKTjCu0HRTYRk",
+      authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
+      projectId: "expensetrackermvp-fdfd1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let expenseChartInstance = null;
+
+    async function loadData() {
+      const userIdInput = document.getElementById("userId").value.trim();
+
+      if (!userIdInput.startsWith("+94")) {
+        alert("Please enter a valid WhatsApp number including +94");
+        return;
+      }
+
+      const userId = "whatsapp:" + userIdInput;
+      const tableBody = document.querySelector("#expenseTable tbody");
+      tableBody.innerHTML = "";
+
+      try {
+        const snapshot = await db.collection("expenses")
+          .doc(userId)
+          .collection("entries")
+          .orderBy("date", "desc")
+          .get();
+
+        if (snapshot.empty) {
+          alert("No entries found for this number");
+          return;
+        }
+
+        const monthlySummary = {};
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+
+          // Handle Firestore Timestamp
+          let dateObj;
+          if (data.date && data.date.toDate) {
+            dateObj = data.date.toDate();
+          } else if (data.date && data.date.timestampValue) {
+            dateObj = new Date(data.date.timestampValue);
+          } else {
+            dateObj = new Date();
+          }
+
+          const monthKey = dateObj.getFullYear() + "-" + String(dateObj.getMonth()+1).padStart(2,"0");
+
+          if (data.type === "Expense") {
+            monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + (data.amount || 0);
+          }
+
+          const row = `<tr>
+            <td>${dateObj.toLocaleDateString()}</td>
+            <td>${data.description || ""}</td>
+            <td>${data.amount || 0}</td>
+            <td>${data.type || ""}</td>
+            <td>${data.category || ""}</td>
+            <td>${data.paid_from || ""}</td>
+          </tr>`;
+          tableBody.insertAdjacentHTML("beforeend", row);
+        });
+
+        // Clear previous chart
+        if (expenseChartInstance) {
+          expenseChartInstance.destroy();
+        }
+
+        // Draw chart
+        const ctx = document.getElementById('expenseChart').getContext('2d');
+        expenseChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: Object.keys(monthlySummary),
+            datasets: [{
+              label: 'Monthly Expenses',
+              data: Object.values(monthlySummary),
+              backgroundColor: 'rgba(54, 162, 235, 0.6)'
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
+      } catch (err) {
+        console.error(err);
+        alert("Error fetching data. Check console for details.");
+      }
+    }
+  </script>
+</body>
+</html>
