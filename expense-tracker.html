@@ -11,6 +11,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background: #f2f2f2; }
+    button.delete-btn { color: white; background: red; border: none; padding: 5px 10px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -29,6 +30,7 @@
         <th>Type</th>
         <th>Category</th>
         <th>Paid From</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -38,7 +40,6 @@
   <canvas id="expenseChart" width="400" height="200"></canvas>
 
   <script>
-    // ===== Firebase Config =====
     const firebaseConfig = {
       apiKey: "AIzaSyCVBouas1jAvQvpRMv7mlqKTjCu0HRTYRk",
       authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
@@ -46,17 +47,14 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
     let expenseChartInstance = null;
 
     async function loadData() {
       const userIdInput = document.getElementById("userId").value.trim();
-
       if (!userIdInput.startsWith("+94")) {
         alert("Please enter a valid WhatsApp number including +94");
         return;
       }
-
       const userId = "whatsapp:" + userIdInput;
       const tableBody = document.querySelector("#expenseTable tbody");
       tableBody.innerHTML = "";
@@ -77,17 +75,8 @@
 
         snapshot.forEach(doc => {
           const data = doc.data();
-
-          // Handle Firestore Timestamp
-          let dateObj;
-          if (data.date && data.date.toDate) {
-            dateObj = data.date.toDate();
-          } else if (data.date && data.date.timestampValue) {
-            dateObj = new Date(data.date.timestampValue);
-          } else {
-            dateObj = new Date();
-          }
-
+          const docId = doc.id;
+          let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
           const monthKey = dateObj.getFullYear() + "-" + String(dateObj.getMonth()+1).padStart(2,"0");
 
           if (data.type === "Expense") {
@@ -101,16 +90,13 @@
             <td>${data.type || ""}</td>
             <td>${data.category || ""}</td>
             <td>${data.paid_from || ""}</td>
+            <td><button class="delete-btn" onclick="deleteEntry('${userId}', '${docId}')">Delete</button></td>
           </tr>`;
           tableBody.insertAdjacentHTML("beforeend", row);
         });
 
-        // Clear previous chart
-        if (expenseChartInstance) {
-          expenseChartInstance.destroy();
-        }
+        if (expenseChartInstance) expenseChartInstance.destroy();
 
-        // Draw chart
         const ctx = document.getElementById('expenseChart').getContext('2d');
         expenseChartInstance = new Chart(ctx, {
           type: 'bar',
@@ -131,7 +117,19 @@
 
       } catch (err) {
         console.error(err);
-        alert("Error fetching data. Check console for details.");
+        alert("Error fetching data");
+      }
+    }
+
+    async function deleteEntry(userId, docId) {
+      if (!confirm("Are you sure you want to delete this entry?")) return;
+      try {
+        await db.collection("expenses").doc(userId).collection("entries").doc(docId).delete();
+        alert("Entry deleted successfully");
+        loadData(); // reload table and chart
+      } catch (err) {
+        console.error(err);
+        alert("Failed to delete entry");
       }
     }
   </script>
