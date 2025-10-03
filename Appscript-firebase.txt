@@ -1,0 +1,84 @@
+function doPost(e) {
+  var msg = e.parameter.Body ? e.parameter.Body.trim() : "";
+  var from = e.parameter.From ? e.parameter.From : "WhatsApp";
+
+  if (!msg) return ContentService.createTextOutput("No message received");
+
+  // Firebase config
+  var FIREBASE_PROJECT_ID = "expensetrackermvp-fdfd1"; // replace with your Firebase project ID
+  var FIREBASE_URL = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents/expenses";
+
+  // Keywords
+  var income_keywords = ["salary", "changed", "exchange", "shani gave"];
+  var cc_keywords = ["sampath", "sampath cc", "combank", "commercial bank", "hnb", "to credit card"];
+  var withdraw_keywords = ["withdraw", "withdrawee"];
+
+  // Split message into lines
+  var lines = msg.split(/\r?\n/);
+
+  lines.forEach(function(line) {
+    line = line.trim();
+    if (!line) return;
+
+    var lowerLine = line.toLowerCase();
+
+    // Determine type
+    var type = "Expense";
+    if (lowerLine.startsWith("from") || income_keywords.some(k => lowerLine.includes(k))) {
+      type = "Income";
+    } else if (cc_keywords.some(k => lowerLine.includes(k))) {
+      type = "Credit Card Repayment";
+    } else if (withdraw_keywords.some(k => lowerLine.includes(k))) {
+      type = "Withdrawal";
+    }
+
+    // Extract amount
+    var amountMatch = line.match(/(\d+(?:\.\d+)?)/);
+    var amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+
+    // Paid From
+    var paidFrom = "cash";
+    if (/\bcd\b/i.test(line)) paidFrom = "cd";
+    else if (/\bbank\b/i.test(line)) paidFrom = "bank";
+
+    // Category detection
+    var category = "Others";
+    if (/keels/.test(lowerLine)) category = "Keels";
+    else if (/foodcity|food city|foodxity/.test(lowerLine)) category = "Foodcity";
+    else if (/train|uber|pickme/.test(lowerLine)) category = "Transport";
+    else if (/fuel|patrol/.test(lowerLine)) category = "Fuel";
+    else if (/cake|ice cream|dinner|bites/.test(lowerLine)) category = "Food";
+    else if (/dialog|mobitel|slt/.test(lowerLine)) category = "Utilities";
+    else if (/gas|water bill|electricity|current bill/.test(lowerLine)) category = "Utilities";
+    else if (/shoes|clothes/.test(lowerLine)) category = "Clothes";
+    else if (/medicine/.test(lowerLine)) category = "Medical";
+
+    // Build Firebase payload
+    var payload = {
+      fields: {
+        date: { timestampValue: new Date().toISOString() },
+        description: { stringValue: line },
+        amount: { doubleValue: amount },
+        type: { stringValue: type },
+        category: { stringValue: category },
+        paid_from: { stringValue: paidFrom },
+        source: { stringValue: from }
+      }
+    };
+
+    // Save to Firebase
+    var url = FIREBASE_URL + "/" + encodeURIComponent(from) + "/entries";
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload)
+    };
+    try {
+      UrlFetchApp.fetch(url, options);
+    } catch (err) {
+      Logger.log("Error saving to Firebase: " + err);
+    }
+  });
+
+  return ContentService.createTextOutput("✅ Saved your entries!");
+}
