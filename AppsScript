@@ -1,0 +1,74 @@
+function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetDetails = ss.getSheetByName("Details") || ss.insertSheet("Details");
+  var sheetCC = ss.getSheetByName("Credit Card Repayments") || ss.insertSheet("Credit Card Repayments");
+  var sheetWithdraw = ss.getSheetByName("Withdrawals") || ss.insertSheet("Withdrawals");
+  var sheetIncome = ss.getSheetByName("Income") || ss.insertSheet("Income");
+
+  try {
+    // Twilio sends form data, not JSON
+    var msg = e.parameter.Body ? e.parameter.Body.trim() : "";
+    var from = e.parameter.From ? e.parameter.From : "WhatsApp";
+    if (!msg) return ContentService.createTextOutput("No message received");
+
+    // Split message into lines (support multiple entries)
+    var lines = msg.split(/\r?\n/);
+
+    // Keywords
+    var income_keywords = ["salary", "changed", "exchange", "shani gave"];
+    var cc_keywords = ["sampath", "sampath cc", "combank", "commercial bank", "hnb","to credit card"];
+    var withdraw_keywords = ["withdraw", "withdrawee"];
+
+    // Loop through lines
+    lines.forEach(function(line) {
+      line = line.trim();
+      if (!line) return;
+
+      var lowerLine = line.toLowerCase();
+
+      // Determine entry type
+      var entryType = "Expense";
+      if (lowerLine.startsWith("from") || income_keywords.some(k => lowerLine.includes(k))) {
+        entryType = "Income";
+      }
+
+      // Extract amount
+      var amountMatch = line.match(/(\d+(?:\.\d+)?)/);
+      var amount = amountMatch ? parseFloat(amountMatch[1]) : "";
+
+      // Determine Paid From
+      var paidFrom = "cash";
+      if (/\bcd\b/i.test(line)) paidFrom = "cd";
+      else if (/\bbank\b/i.test(line)) paidFrom = "bank";
+
+      // Category detection (basic)
+      var category = "Others";
+      if (/keels/.test(lowerLine)) category = "Keels";
+      else if (/foodcity|food city|foodxity/.test(lowerLine)) category = "Foodcity";
+      else if (/train|uber|pickme/.test(lowerLine)) category = "Transport";
+      else if (/fuel|patrol/.test(lowerLine)) category = "Fuel";
+      else if (/cake|ice cream|dinner|bites/.test(lowerLine)) category = "Food";
+      else if (/dialog|mobitel|slt/.test(lowerLine)) category = "Utilities";
+      else if (/gas|water bill|electricity|current bill/.test(lowerLine)) category = "Utilities";
+      else if (/shoes|clothes/.test(lowerLine)) category = "Clothes";
+      else if (/medicine/.test(lowerLine)) category = "Medical";
+
+      // --- Special handling ---
+      if (entryType === "Income") {
+        sheetIncome.appendRow([new Date(), line, amount, entryType, category, paidFrom, from]);
+      } else if (cc_keywords.some(k => lowerLine.includes(k))) {
+        sheetCC.appendRow([new Date(), line, amount, "Credit Card Repayment", category, paidFrom, from]);
+      } else if (withdraw_keywords.some(k => lowerLine.includes(k))) {
+        sheetWithdraw.appendRow([new Date(), line, amount, "Withdrawal", category, paidFrom, from]);
+      } else {
+        // Normal expense
+        sheetDetails.appendRow([new Date(), line, amount, "Expense", category, paidFrom, from]);
+      }
+    });
+
+    return ContentService.createTextOutput("Saved message");
+
+  } catch (err) {
+    return ContentService.createTextOutput("Error: " + err);
+  }
+}
