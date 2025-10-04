@@ -7,14 +7,53 @@
   <style>
     body {
       font-family: "Segoe UI", Arial, sans-serif;
-      padding: 20px;
+      padding: 0;
+      margin: 0;
       background: #f8f9fa;
       color: #333;
     }
 
+    /* Navigation Bar */
+    .navbar {
+      background: #007bff;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 20px;
+    }
+
+    .navbar h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .navbar .nav-links {
+      display: flex;
+      gap: 15px;
+    }
+
+    .navbar a {
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: 0.3s;
+    }
+
+    .navbar a:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
     h2, h3 {
       text-align: center;
-      margin-bottom: 15px;
+      margin: 20px 0 10px;
+    }
+
+    .container {
+      padding: 20px;
     }
 
     .card {
@@ -95,42 +134,52 @@
   </style>
 </head>
 <body>
-  <h2>💰 Expense Tracker Dashboard</h2>
-
-  <div class="card">
-    <p>Enter your WhatsApp number (without +94, e.g., 771234567):</p>
-    <input type="text" id="userId" placeholder="771234567">
-    <button onclick="loadData()">View My Expenses</button>
-    <a href="summary.html"><button style="background:green;">View Monthly Summary</button></a>
+  <!-- Navigation Bar -->
+  <div class="navbar">
+    <h1>Expense Tracker</h1>
+    <div class="nav-links">
+      <a href="index.html">Dashboard</a>
+      <a href="summary.html">Monthly Summary</a>
+    </div>
   </div>
 
-  <div class="card">
-    <h3>Your Expenses</h3>
+  <div class="container">
+    <h2>💰 Expense Tracker Dashboard</h2>
 
-    <!-- Filters -->
-    <div class="filters">
-      <select id="filterType" onchange="applyFilters()">
-        <option value="">All Types</option>
-      </select>
-      <select id="filterCategory" onchange="applyFilters()">
-        <option value="">All Categories</option>
-      </select>
+    <div class="card">
+      <p>Enter your WhatsApp number (without +94, e.g., 771234567):</p>
+      <input type="text" id="userId" placeholder="771234567">
+      <button onclick="loadData()">View My Expenses</button>
     </div>
 
-    <table id="expenseTable">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Description</th>
-          <th>Amount</th>
-          <th>Type</th>
-          <th>Category</th>
-          <th>Paid From</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="card">
+      <h3>Your Expenses</h3>
+
+      <!-- Filters -->
+      <div class="filters">
+        <select id="filterType" onchange="applyFilters()">
+          <option value="">All Types</option>
+        </select>
+        <select id="filterCategory" onchange="applyFilters()">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+
+      <table id="expenseTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Category</th>
+            <th>Paid From</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
