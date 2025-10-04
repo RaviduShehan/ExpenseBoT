@@ -26,10 +26,6 @@
     <button onclick="location.href='summary.html'">Monthly Summary</button>
   </nav>
 
-  <p>Enter your WhatsApp number (without +94, e.g., 77xxxxxxx):</p>
-  <input type="text" id="userId" placeholder="77xxxxxxx">
-  <button onclick="loadSummary()">View Summary</button>
-
   <div class="summary-box">
     <h3>Total Monthly Expenses: <span id="monthlyTotal">0</span></h3>
     <div id="warning"></div>
@@ -48,12 +44,11 @@
     const MAX_BUDGET = 100000;
 
     async function loadSummary() {
-      let userIdInput = document.getElementById("userId").value.trim();
-      if (!userIdInput.match(/^[0-9]{9}$/)) {
-        alert("Please enter a valid WhatsApp number without +94 (e.g., 77xxxxxxx)");
+      const userId = localStorage.getItem("userId"); // Get from index.html
+      if (!userId) {
+        alert("Please go back and enter your WhatsApp number first.");
         return;
       }
-      const userId = "whatsapp:+94" + userIdInput;
 
       try {
         const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
@@ -88,21 +83,29 @@
 
         const ctx = document.getElementById("categoryChart").getContext("2d");
         categoryChartInstance = new Chart(ctx, {
-          type: "pie",
+          type: "bar",
           data: {
             labels: Object.keys(categoryTotals),
             datasets: [{
+              label: "Expenses by Category",
               data: Object.values(categoryTotals),
               backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"]
             }]
           },
-          options: { responsive: true }
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
         });
       } catch (err) {
         console.error(err);
         alert("Error loading summary");
       }
     }
+
+    // Auto-load summary when page opens
+    window.onload = loadSummary;
   </script>
 </body>
 </html>
