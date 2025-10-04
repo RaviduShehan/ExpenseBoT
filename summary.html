@@ -43,13 +43,12 @@
     let categoryChartInstance = null;
     const MAX_BUDGET = 100000;
 
-    async function loadSummary() {
-      const userId = localStorage.getItem("userId"); // Get from index.html
-      if (!userId) {
-        alert("Please go back and enter your WhatsApp number first.");
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+        alert("No WhatsApp number found. Redirecting...");
+        window.location.href = "index.html";
         return;
-      }
-
+    }
       try {
         const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
         if (snapshot.empty) {

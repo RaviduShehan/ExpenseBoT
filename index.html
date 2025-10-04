@@ -59,6 +59,8 @@
     <h3>This Month’s Total: <span id="monthlyTotal">0</span></h3>
     <div id="warning"></div>
   </div>
+  <input type="text" id="userId" placeholder="Enter WhatsApp number (77xxxxxxx)" 
+  oninput="saveUserId()" />
 
   <script>
     const firebaseConfig = {
@@ -69,6 +71,14 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const MAX_BUDGET = 100000;
+
+    async function saveUserId() {
+    const userIdInput = document.getElementById("userId").value.trim();
+    if (userIdInput.match(/^[0-9]{9}$/)) {
+      const userId = "whatsapp:+94" + userIdInput;
+      localStorage.setItem("userId", userId);
+    }
+  }
   
     async function loadData() {
       let userIdInput = document.getElementById("userId").value.trim();
