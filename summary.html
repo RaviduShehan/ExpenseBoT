@@ -38,70 +38,71 @@
       authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
       projectId: "expensetrackermvp-fdfd1"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     let categoryChartInstance = null;
     const MAX_BUDGET = 100000;
 
     const userId = localStorage.getItem("userId");
-    if (!userId) {
-        alert("No WhatsApp number found. Redirecting...");
-        window.location.href = "index.html";
+        if (!userId) {
+            alert("No WhatsApp number found. Redirecting...");
+            window.location.href = "index.html";
+            return;
+        }
+    try {
+    const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
+    if (snapshot.empty) {
+        alert("No entries found for this number");
         return;
     }
-      try {
-        const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
-        if (snapshot.empty) {
-          alert("No entries found for this number");
-          return;
+
+    let categoryTotals = {};
+    let total = 0;
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
+        if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear && data.type === "Expense") {
+        total += data.amount || 0;
+        categoryTotals[data.category] = (categoryTotals[data.category] || 0) + (data.amount || 0);
         }
+    });
 
-        let categoryTotals = {};
-        let total = 0;
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
+    document.getElementById("monthlyTotal").innerText = total;
 
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
-          if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear && data.type === "Expense") {
-            total += data.amount || 0;
-            categoryTotals[data.category] = (categoryTotals[data.category] || 0) + (data.amount || 0);
-          }
-        });
-
-        document.getElementById("monthlyTotal").innerText = total;
-
-        if (total > MAX_BUDGET) {
-          document.getElementById("warning").innerText = "⚠️ Warning: You have exceeded your monthly budget of " + MAX_BUDGET;
-        } else {
-          document.getElementById("warning").innerText = "";
-        }
-
-        if (categoryChartInstance) categoryChartInstance.destroy();
-
-        const ctx = document.getElementById("categoryChart").getContext("2d");
-        categoryChartInstance = new Chart(ctx, {
-          type: "bar",
-          data: {
-            labels: Object.keys(categoryTotals),
-            datasets: [{
-              label: "Expenses by Category",
-              data: Object.values(categoryTotals),
-              backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"]
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-          }
-        });
-      } catch (err) {
-        console.error(err);
-        alert("Error loading summary");
-      }
+    if (total > MAX_BUDGET) {
+        document.getElementById("warning").innerText = "⚠️ Warning: You have exceeded your monthly budget of " + MAX_BUDGET;
+    } else {
+        document.getElementById("warning").innerText = "";
     }
+
+    if (categoryChartInstance) categoryChartInstance.destroy();
+
+    const ctx = document.getElementById("categoryChart").getContext("2d");
+    categoryChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+        labels: Object.keys(categoryTotals),
+        datasets: [{
+            label: "Expenses by Category",
+            data: Object.values(categoryTotals),
+            backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"]
+        }]
+        },
+        options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+        }
+    });
+    } catch (err) {
+    console.error(err);
+    alert("Error loading summary");
+    }
+
 
     // Auto-load summary when page opens
     window.onload = loadSummary;

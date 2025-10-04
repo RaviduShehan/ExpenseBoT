@@ -35,7 +35,7 @@
   </nav>
 
   <p>Enter your WhatsApp number (without +94, e.g., 77xxxxxxx):</p>
-  <input type="text" id="userId" placeholder="77xxxxxxx">
+  <input type="text" id="userId" placeholder="77xxxxxxx" oninput="saveUserId()">
   <button onclick="loadData()">View My Expenses</button>
 
   <h3>Your Expenses</h3>
@@ -59,8 +59,6 @@
     <h3>This Month’s Total: <span id="monthlyTotal">0</span></h3>
     <div id="warning"></div>
   </div>
-  <input type="text" id="userId" placeholder="Enter WhatsApp number (77xxxxxxx)" 
-  oninput="saveUserId()" />
 
   <script>
     const firebaseConfig = {
