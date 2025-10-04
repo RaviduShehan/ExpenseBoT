@@ -1,64 +1,39 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Monthly Expense Summary</title>
+  <meta charset="UTF-8">
+  <title>Monthly Summary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      padding: 20px;
-      background: #f8f9fa;
-      color: #333;
-    }
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 20px;
-    }
-    th, td {
-      padding: 12px;
-      border: 1px solid #ddd;
-    }
-    th {
-      background: #007bff;
-      color: white;
-    }
+    body { font-family: Arial, sans-serif; padding: 15px; margin: 0; background: #f9f9f9; }
+    h2 { text-align: center; }
+    nav { text-align: center; margin-bottom: 20px; }
+    nav button { margin: 5px; padding: 10px; border: none; border-radius: 5px; background: #007BFF; color: white; cursor: pointer; }
+    nav button:hover { background: #0056b3; }
+    .summary-box { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    #warning { color: red; font-weight: bold; text-align: center; margin-top: 15px; }
+    canvas { max-width: 100%; }
   </style>
 </head>
 <body>
-  <h2>📊 Monthly Expense Summary</h2>
+  <h2>Monthly Expense Summary</h2>
+  
+  <nav>
+    <button onclick="location.href='index.html'">Home</button>
+    <button onclick="location.href='summary.html'">Monthly Summary</button>
+  </nav>
 
-  <div class="card">
-    <p>Enter your WhatsApp number (without +94, e.g., 771234567):</p>
-    <input type="text" id="userId" placeholder="771234567">
-    <button onclick="loadSummary()">View Summary</button>
-    <a href="index.html"><button style="background:gray;">Back to Dashboard</button></a>
-  </div>
+  <p>Enter your WhatsApp number (without +94, e.g., 77xxxxxxx):</p>
+  <input type="text" id="userId" placeholder="77xxxxxxx">
+  <button onclick="loadSummary()">View Summary</button>
 
-  <div class="card">
-    <canvas id="expenseChart" height="120"></canvas>
-    <table id="summaryTable">
-      <thead>
-        <tr>
-          <th>Month</th>
-          <th>Total Expenses</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+  <div class="summary-box">
+    <h3>Total Monthly Expenses: <span id="monthlyTotal">0</span></h3>
+    <div id="warning"></div>
+    <canvas id="categoryChart"></canvas>
   </div>
 
   <script>
@@ -69,63 +44,64 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    let chartInstance = null;
+    let categoryChartInstance = null;
+    const MAX_BUDGET = 100000;
 
     async function loadSummary() {
-      const rawInput = document.getElementById("userId").value.trim();
-      if (!/^[0-9]{9}$/.test(rawInput)) {
-        alert("Please enter a valid 9-digit WhatsApp number (e.g., 771234567)");
+      let userIdInput = document.getElementById("userId").value.trim();
+      if (!userIdInput.match(/^[0-9]{9}$/)) {
+        alert("Please enter a valid WhatsApp number without +94 (e.g., 77xxxxxxx)");
         return;
       }
-      const userId = "whatsapp:+94" + rawInput;
+      const userId = "whatsapp:+94" + userIdInput;
 
-      const snapshot = await db.collection("expenses")
-        .doc(userId)
-        .collection("entries")
-        .orderBy("date", "desc")
-        .get();
-
-      if (snapshot.empty) {
-        alert("No entries found");
-        return;
-      }
-
-      const monthlySummary = {};
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (!data.date) return;
-        let dateObj = data.date.toDate ? data.date.toDate() : new Date();
-        const monthKey = dateObj.getFullYear() + "-" + String(dateObj.getMonth()+1).padStart(2,"0");
-        if (data.type === "Expense") {
-          monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + (data.amount || 0);
+      try {
+        const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
+        if (snapshot.empty) {
+          alert("No entries found for this number");
+          return;
         }
-      });
 
-      const months = Object.keys(monthlySummary).sort();
-      const totals = months.map(m => monthlySummary[m]);
+        let categoryTotals = {};
+        let total = 0;
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
 
-      // Update chart
-      if (chartInstance) chartInstance.destroy();
-      const ctx = document.getElementById("expenseChart").getContext("2d");
-      chartInstance = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: months,
-          datasets: [{
-            label: "Monthly Expenses",
-            data: totals,
-            backgroundColor: "rgba(54, 162, 235, 0.7)"
-          }]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
-      });
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
+          if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear && data.type === "Expense") {
+            total += data.amount || 0;
+            categoryTotals[data.category] = (categoryTotals[data.category] || 0) + (data.amount || 0);
+          }
+        });
 
-      // Update table
-      const tbody = document.querySelector("#summaryTable tbody");
-      tbody.innerHTML = "";
-      months.forEach((m, i) => {
-        tbody.innerHTML += `<tr><td>${m}</td><td>${totals[i]}</td></tr>`;
-      });
+        document.getElementById("monthlyTotal").innerText = total;
+
+        if (total > MAX_BUDGET) {
+          document.getElementById("warning").innerText = "⚠️ Warning: You have exceeded your monthly budget of " + MAX_BUDGET;
+        } else {
+          document.getElementById("warning").innerText = "";
+        }
+
+        if (categoryChartInstance) categoryChartInstance.destroy();
+
+        const ctx = document.getElementById("categoryChart").getContext("2d");
+        categoryChartInstance = new Chart(ctx, {
+          type: "pie",
+          data: {
+            labels: Object.keys(categoryTotals),
+            datasets: [{
+              data: Object.values(categoryTotals),
+              backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"]
+            }]
+          },
+          options: { responsive: true }
+        });
+      } catch (err) {
+        console.error(err);
+        alert("Error loading summary");
+      }
     }
   </script>
 </body>
