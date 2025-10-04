@@ -98,9 +98,10 @@
   <h2>💰 Expense Tracker Dashboard</h2>
 
   <div class="card">
-    <p>Enter your WhatsApp number (e.g., +9477xxxxxxx):</p>
-    <input type="text" id="userId" placeholder="+9477xxxxxxx">
+    <p>Enter your WhatsApp number (without +94, e.g., 771234567):</p>
+    <input type="text" id="userId" placeholder="771234567">
     <button onclick="loadData()">View My Expenses</button>
+    <a href="summary.html"><button style="background:green;">View Monthly Summary</button></a>
   </div>
 
   <div class="card">
@@ -144,12 +145,13 @@
     let allEntries = []; // keep all entries for filtering
 
     async function loadData() {
-      const userIdInput = document.getElementById("userId").value.trim();
-      if (!userIdInput.startsWith("+94")) {
-        alert("Please enter a valid WhatsApp number including +94");
+      const rawInput = document.getElementById("userId").value.trim();
+      if (!/^[0-9]{9}$/.test(rawInput)) {
+        alert("Please enter a valid 9-digit WhatsApp number (e.g., 771234567)");
         return;
       }
-      const userId = "whatsapp:" + userIdInput;
+      const userId = "whatsapp:+94" + rawInput;
+
       const tableBody = document.querySelector("#expenseTable tbody");
       tableBody.innerHTML = "";
 
@@ -165,7 +167,7 @@
           return;
         }
 
-        allEntries = []; // reset entries
+        allEntries = []; 
         snapshot.forEach(doc => {
           const data = doc.data();
           const docId = doc.id;
@@ -237,7 +239,7 @@
       try {
         await db.collection("expenses").doc(userId).collection("entries").doc(docId).delete();
         alert("Entry deleted successfully");
-        loadData(); // reload after delete
+        loadData(); 
       } catch (err) {
         console.error(err);
         alert("Failed to delete entry");

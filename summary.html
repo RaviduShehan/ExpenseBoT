@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Monthly Expense Summary</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      padding: 20px;
+      background: #f8f9fa;
+      color: #333;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+    }
+    th {
+      background: #007bff;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h2>📊 Monthly Expense Summary</h2>
+
+  <div class="card">
+    <p>Enter your WhatsApp number (without +94, e.g., 771234567):</p>
+    <input type="text" id="userId" placeholder="771234567">
+    <button onclick="loadSummary()">View Summary</button>
+    <a href="index.html"><button style="background:gray;">Back to Dashboard</button></a>
+  </div>
+
+  <div class="card">
+    <canvas id="expenseChart" height="120"></canvas>
+    <table id="summaryTable">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Total Expenses</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCVBouas1jAvQvpRMv7mlqKTjCu0HRTYRk",
+      authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
+      projectId: "expensetrackermvp-fdfd1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    let chartInstance = null;
+
+    async function loadSummary() {
+      const rawInput = document.getElementById("userId").value.trim();
+      if (!/^[0-9]{9}$/.test(rawInput)) {
+        alert("Please enter a valid 9-digit WhatsApp number (e.g., 771234567)");
+        return;
+      }
+      const userId = "whatsapp:+94" + rawInput;
+
+      const snapshot = await db.collection("expenses")
+        .doc(userId)
+        .collection("entries")
+        .orderBy("date", "desc")
+        .get();
+
+      if (snapshot.empty) {
+        alert("No entries found");
+        return;
+      }
+
+      const monthlySummary = {};
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (!data.date) return;
+        let dateObj = data.date.toDate ? data.date.toDate() : new Date();
+        const monthKey = dateObj.getFullYear() + "-" + String(dateObj.getMonth()+1).padStart(2,"0");
+        if (data.type === "Expense") {
+          monthlySummary[monthKey] = (monthlySummary[monthKey] || 0) + (data.amount || 0);
+        }
+      });
+
+      const months = Object.keys(monthlySummary).sort();
+      const totals = months.map(m => monthlySummary[m]);
+
+      // Update chart
+      if (chartInstance) chartInstance.destroy();
+      const ctx = document.getElementById("expenseChart").getContext("2d");
+      chartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: months,
+          datasets: [{
+            label: "Monthly Expenses",
+            data: totals,
+            backgroundColor: "rgba(54, 162, 235, 0.7)"
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+
+      // Update table
+      const tbody = document.querySelector("#summaryTable tbody");
+      tbody.innerHTML = "";
+      months.forEach((m, i) => {
+        tbody.innerHTML += `<tr><td>${m}</td><td>${totals[i]}</td></tr>`;
+      });
+    }
+  </script>
+</body>
+</html>
