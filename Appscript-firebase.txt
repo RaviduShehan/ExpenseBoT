@@ -82,3 +82,83 @@ function doPost(e) {
 
   return ContentService.createTextOutput("✅ Saved your entries!");
 }
+-----------------------------------------
+
+
+function doPost(e) {
+  var msg = e.parameter.Body ? e.parameter.Body.trim() : "";
+  var from = e.parameter.From ? e.parameter.From.replace("whatsapp:", "").trim() : "";
+
+  if (!msg) return ContentService.createTextOutput("No message received");
+
+  // Firebase setup
+  var FIREBASE_PROJECT_ID = "expensetrackermvp-fdfd1";
+  var FIREBASE_URL = "https://firestore.googleapis.com/v1/projects/" + FIREBASE_PROJECT_ID + "/databases/(default)/documents";
+
+  try {
+    // Step 1: Find user by WhatsApp number
+    var userLookupUrl = FIREBASE_URL + "/users?where=whatsapp_number=='" + from + "'";
+    var userResponse = UrlFetchApp.fetch(userLookupUrl, { method: "get", muteHttpExceptions: true });
+    var userData = JSON.parse(userResponse.getContentText());
+    var userId = null;
+
+    if (userData && userData.documents && userData.documents.length > 0) {
+      var nameParts = userData.documents[0].name.split("/");
+      userId = nameParts[nameParts.length - 1];
+    } else {
+      Logger.log("User not found for WhatsApp: " + from);
+      return ContentService.createTextOutput("⚠️ WhatsApp not linked to any registered user.");
+    }
+
+    // Step 2: Detect type and category
+    var lowerLine = msg.toLowerCase();
+    var type = "Expense";
+    if (lowerLine.startsWith("from") || /(salary|changed|exchange|shani gave)/.test(lowerLine)) type = "Income";
+    else if (/(sampath|combank|to credit card|hnb)/.test(lowerLine)) type = "Credit Card Repayment";
+    else if (/(withdraw|atm)/.test(lowerLine)) type = "Withdrawal";
+
+    var category = "Others";
+    if (/keels/.test(lowerLine)) category = "Keels";
+    else if (/foodcity|food city|foodxity/.test(lowerLine)) category = "Foodcity";
+    else if (/train|uber|pickme/.test(lowerLine)) category = "Transport";
+    else if (/fuel|patrol/.test(lowerLine)) category = "Fuel";
+    else if (/cake|ice cream|dinner|bites/.test(lowerLine)) category = "Food";
+    else if (/dialog|mobitel|slt/.test(lowerLine)) category = "Utilities";
+    else if (/gas|water bill|electricity|current bill/.test(lowerLine)) category = "Utilities";
+    else if (/shoes|clothes/.test(lowerLine)) category = "Clothes";
+    else if (/medicine/.test(lowerLine)) category = "Medical";
+
+    var paidFrom = "cash";
+    if (/\bcd\b/i.test(lowerLine)) paidFrom = "cd";
+    else if (/\bbank\b/i.test(lowerLine)) paidFrom = "bank";
+
+    var amountMatch = msg.match(/(\d+(?:\.\d+)?)/);
+    var amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+
+    // Step 3: Create Firestore document
+    var payload = {
+      fields: {
+        date: { timestampValue: new Date().toISOString() },
+        description: { stringValue: msg },
+        amount: { doubleValue: amount },
+        type: { stringValue: type },
+        category: { stringValue: category },
+        paid_from: { stringValue: paidFrom },
+        source: { stringValue: "WhatsApp" },
+        whatsapp_number: { stringValue: from }
+      }
+    };
+
+    var entryUrl = FIREBASE_URL + "/expenses/" + userId + "/entries";
+    UrlFetchApp.fetch(entryUrl, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload)
+    });
+
+    return ContentService.createTextOutput("✅ Expense saved for " + from);
+  } catch (err) {
+    Logger.log("Error: " + err);
+    return ContentService.createTextOutput("⚠️ Error saving expense.");
+  }
+}

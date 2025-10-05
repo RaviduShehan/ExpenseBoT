@@ -1,111 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <title>Monthly Summary</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="firebase.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 15px; margin: 0; background: #f9f9f9; }
-    h2 { text-align: center; }
-    nav { text-align: center; margin-bottom: 20px; }
-    nav button { margin: 5px; padding: 10px; border: none; border-radius: 5px; background: #007BFF; color: white; cursor: pointer; }
-    nav button:hover { background: #0056b3; }
-    .summary-box { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    #warning { color: red; font-weight: bold; text-align: center; margin-top: 15px; }
-    canvas { max-width: 100%; }
+    body { font-family: Poppins; padding: 10px; background: #f9fafc; text-align: center; }
+    canvas { width: 100%; max-width: 600px; margin: auto; }
+    button { margin: 10px; padding: 8px 14px; border: none; background: #007bff; color: white; border-radius: 6px; }
   </style>
 </head>
 <body>
-  <h2>Monthly Expense Summary</h2>
-  
-  <nav>
-    <button onclick="location.href='index.html'">Home</button>
-    <button onclick="location.href='summary.html'">Monthly Summary</button>
-  </nav>
-
-  <div class="summary-box">
-    <h3>Total Monthly Expenses: <span id="monthlyTotal">0</span></h3>
-    <div id="warning"></div>
-    <canvas id="categoryChart"></canvas>
-  </div>
+  <button onclick="window.location.href='dashboard.html'">⬅ Back</button>
+  <h3>Category-wise Expense Summary</h3>
+  <canvas id="categoryChart"></canvas>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCVBouas1jAvQvpRMv7mlqKTjCu0HRTYRk",
-      authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
-      projectId: "expensetrackermvp-fdfd1"
-    };
+    const uid = localStorage.getItem("uid");
+    if (!uid) window.location.href = "index.html";
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    let categoryChartInstance = null;
-    const MAX_BUDGET = 100000;
-
-    const userId = localStorage.getItem("userId");
-        if (!userId) {
-            alert("No WhatsApp number found. Redirecting...");
-            window.location.href = "index.html";
-            return;
+    async function loadSummary() {
+      const snapshot = await db.collection("expenses").doc(uid).collection("entries").get();
+      const categories = {};
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.type === "Expense") {
+          categories[d.category] = (categories[d.category] || 0) + d.amount;
         }
-    try {
-    const snapshot = await db.collection("expenses").doc(userId).collection("entries").get();
-    if (snapshot.empty) {
-        alert("No entries found for this number");
-        return;
-    }
+      });
 
-    let categoryTotals = {};
-    let total = 0;
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
-        if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear && data.type === "Expense") {
-        total += data.amount || 0;
-        categoryTotals[data.category] = (categoryTotals[data.category] || 0) + (data.amount || 0);
-        }
-    });
-
-    document.getElementById("monthlyTotal").innerText = total;
-
-    if (total > MAX_BUDGET) {
-        document.getElementById("warning").innerText = "⚠️ Warning: You have exceeded your monthly budget of " + MAX_BUDGET;
-    } else {
-        document.getElementById("warning").innerText = "";
-    }
-
-    if (categoryChartInstance) categoryChartInstance.destroy();
-
-    const ctx = document.getElementById("categoryChart").getContext("2d");
-    categoryChartInstance = new Chart(ctx, {
+      const ctx = document.getElementById("categoryChart");
+      new Chart(ctx, {
         type: "bar",
         data: {
-        labels: Object.keys(categoryTotals),
-        datasets: [{
+          labels: Object.keys(categories),
+          datasets: [{
             label: "Expenses by Category",
-            data: Object.values(categoryTotals),
-            backgroundColor: ["#FF6384","#36A2EB","#FFCE56","#4BC0C0","#9966FF","#FF9F40"]
-        }]
+            data: Object.values(categories),
+            backgroundColor: "rgba(75,192,192,0.6)"
+          }]
         },
-        options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } }
-        }
-    });
-    } catch (err) {
-    console.error(err);
-    alert("Error loading summary");
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
     }
-
-
-    // Auto-load summary when page opens
-    window.onload = loadSummary;
+    loadSummary();
   </script>
 </body>
 </html>
