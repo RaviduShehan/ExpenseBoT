@@ -1,52 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Monthly Summary</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpenseBoT - Summary</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="firebase.js"></script>
   <style>
-    body { font-family: Poppins; padding: 10px; background: #f9fafc; text-align: center; }
-    canvas { width: 100%; max-width: 600px; margin: auto; }
-    button { margin: 10px; padding: 8px 14px; border: none; background: #007bff; color: white; border-radius: 6px; }
+    body { font-family: Arial; padding:20px; background:#f4f4f4;}
+    .container { max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+    table { width:100%; border-collapse: collapse; margin-top:20px;}
+    th, td { border:1px solid #ccc; padding:10px; text-align:left;}
+    th { background:#007bff; color:white; }
   </style>
 </head>
 <body>
-  <button onclick="window.location.href='dashboard.html'">⬅ Back</button>
-  <h3>Category-wise Expense Summary</h3>
-  <canvas id="categoryChart"></canvas>
 
-  <script>
-    const uid = localStorage.getItem("uid");
-    if (!uid) window.location.href = "index.html";
+<div class="container">
+  <h2>Expense Summary</h2>
+  <table id="summaryTable">
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Total Amount</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <h3><a href="dashboard.html">Back to Dashboard</a></h3>
+</div>
 
-    async function loadSummary() {
-      const snapshot = await db.collection("expenses").doc(uid).collection("entries").get();
-      const categories = {};
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        if (d.type === "Expense") {
-          categories[d.category] = (categories[d.category] || 0) + d.amount;
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  auth.onAuthStateChanged(user => {
+    if(!user) window.location.href="index.html";
+    else loadSummary(user.uid);
+  });
+
+  function loadSummary(uid){
+    db.collection('expenses').doc(uid).collection('entries').get().then(snapshot=>{
+      const categoryTotals = {};
+      snapshot.forEach(doc=>{
+        const data = doc.data();
+        if(data.type === "Expense"){
+          categoryTotals[data.category] = (categoryTotals[data.category] || 0) + data.amount;
         }
       });
 
-      const ctx = document.getElementById("categoryChart");
-      new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: Object.keys(categories),
-          datasets: [{
-            label: "Expenses by Category",
-            data: Object.values(categories),
-            backgroundColor: "rgba(75,192,192,0.6)"
-          }]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
-      });
-    }
-    loadSummary();
-  </script>
+      const tbody = document.querySelector('#summaryTable tbody');
+      tbody.innerHTML = '';
+      for(const cat in categoryTotals){
+        const row = `<tr><td>${cat}</td><td>${categoryTotals[cat]}</td></tr>`;
+        tbody.innerHTML += row;
+      }
+    });
+  }
+</script>
+
 </body>
 </html>

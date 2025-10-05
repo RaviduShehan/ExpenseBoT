@@ -1,92 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Expense Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ExpenseBoT - Dashboard</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="firebase.js"></script>
   <style>
-    body { font-family: Poppins, sans-serif; padding: 10px; background: #f9fafc; }
-    .nav { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
-    th, td { padding: 10px; border-bottom: 1px solid #eee; }
-    th { background: #f0f0f0; }
-    .add-form input, select { padding: 6px; margin: 5px; }
-    .budget-warning { background: #ffe5e5; color: red; font-weight: bold; padding: 8px; border-radius: 6px; text-align: center; margin: 10px 0; display: none; }
-    button { cursor: pointer; background: #007bff; color: white; border: none; border-radius: 6px; padding: 6px 12px; }
+    body { font-family: Arial; padding:20px; background:#f4f4f4;}
+    .container { max-width:600px; margin:auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+    button { padding:10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; }
+    button:hover { background:#0056b3; }
   </style>
 </head>
 <body>
-  <div class="nav">
-    <h3>Expense Dashboard</h3>
-    <button onclick="window.location.href='summary.html'">View Summary</button>
-  </div>
 
-  <div class="budget-warning" id="budgetWarning">⚠️ Monthly budget exceeded!</div>
+<div class="container">
+  <h2>Dashboard</h2>
+  <p>Welcome, <span id="username"></span></p>
+  <button id="logoutBtn">Logout</button>
 
-  <div class="add-form">
-    <input type="text" id="desc" placeholder="Description">
-    <input type="number" id="amount" placeholder="Amount">
+  <h3>Add Expense</h3>
+  <form id="expenseForm">
+    <input type="text" id="desc" placeholder="Description" required>
+    <input type="number" id="amount" placeholder="Amount" required>
     <select id="type">
       <option>Expense</option>
       <option>Income</option>
+      <option>Credit Card</option>
+      <option>Withdrawal</option>
     </select>
-    <input type="text" id="category" placeholder="Category">
+    <input type="text" id="category" placeholder="Category" required>
     <select id="paidFrom">
-      <option>Cash</option>
-      <option>Bank</option>
-      <option>CD</option>
+      <option>cash</option>
+      <option>cd</option>
+      <option>bank</option>
     </select>
-    <button onclick="addEntry()">Add</button>
-  </div>
+    <button type="submit">Add Entry</button>
+  </form>
 
-  <table id="expenseTable">
-    <thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Type</th><th>Category</th><th>Paid From</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <h3><a href="summary.html">Go to Summary</a></h3>
+</div>
 
-  <script>
-    const uid = localStorage.getItem("uid");
-    const whatsapp = localStorage.getItem("whatsapp");
-    const budgetLimit = 100000;
-    if (!uid) window.location.href = "index.html";
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
 
-    async function loadExpenses() {
-      const tableBody = document.querySelector("#expenseTable tbody");
-      tableBody.innerHTML = "";
-      const snapshot = await db.collection("expenses").doc(uid).collection("entries").orderBy("date", "desc").get();
-      let monthlyTotal = 0;
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        const date = d.date?.toDate ? d.date.toDate().toLocaleDateString() : "-";
-        if (d.type === "Expense") monthlyTotal += d.amount || 0;
-        const row = `<tr>
-          <td>${date}</td><td>${d.description}</td><td>${d.amount}</td>
-          <td>${d.type}</td><td>${d.category}</td><td>${d.paid_from}</td>
-        </tr>`;
-        tableBody.insertAdjacentHTML("beforeend", row);
+  auth.onAuthStateChanged(user => {
+    if(!user) {
+      window.location.href = "index.html";
+    } else {
+      db.collection('users').doc(user.uid).get().then(doc => {
+        document.getElementById('username').innerText = doc.data().name || user.displayName;
       });
-      if (monthlyTotal > budgetLimit) document.getElementById("budgetWarning").style.display = "block";
     }
+  });
 
-    async function addEntry() {
-      const data = {
-        description: document.getElementById("desc").value,
-        amount: parseFloat(document.getElementById("amount").value),
-        type: document.getElementById("type").value,
-        category: document.getElementById("category").value,
-        paid_from: document.getElementById("paidFrom").value,
-        date: new Date()
-      };
-      await db.collection("expenses").doc(uid).collection("entries").add(data);
-      alert("Added!");
-      loadExpenses();
-    }
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    auth.signOut().then(()=> window.location.href="index.html");
+  });
 
-    loadExpenses();
-  </script>
+  // Add expense
+  document.getElementById('expenseForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    db.collection('expenses').doc(user.uid).collection('entries').add({
+      date: new Date(),
+      description: document.getElementById('desc').value,
+      amount: parseFloat(document.getElementById('amount').value),
+      type: document.getElementById('type').value,
+      category: document.getElementById('category').value,
+      paid_from: document.getElementById('paidFrom').value,
+      source: user.uid
+    }).then(() => {
+      alert('Expense Added!');
+      document.getElementById('expenseForm').reset();
+    }).catch(err => console.error(err));
+  });
+</script>
+
 </body>
 </html>

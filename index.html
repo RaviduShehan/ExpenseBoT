@@ -3,81 +3,81 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ExpenseBoT Signup</title>
+  <title>ExpenseBoT - Signup/Login</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .container {
-      background: #fff;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      width: 300px;
-      text-align: center;
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      font-size: 16px;
-    }
-    button {
-      width: 100%;
-      padding: 10px;
-      background-color: #007bff;
-      border: none;
-      color: white;
-      font-size: 16px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
+    body { font-family: Arial; display:flex; justify-content:center; align-items:center; height:100vh; background:#f4f4f4; }
+    .container { background:#fff; padding:30px; border-radius:10px; width:300px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+    input { width:100%; padding:10px; margin:10px 0; border-radius:5px; border:1px solid #ccc; font-size:16px;}
+    button { width:100%; padding:10px; background:#007bff; border:none; color:white; font-size:16px; border-radius:5px; cursor:pointer;}
+    button:hover { background:#0056b3; }
+    #whatsappForm { display:none; }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h2>Welcome to ExpenseBoT</h2>
-    <form id="signupForm">
-      <input type="text" id="whatsapp" placeholder="Enter WhatsApp number" required>
-      <button type="submit">Save and Continue</button>
-    </form>
-  </div>
+<div class="container">
+  <h2>Welcome to ExpenseBoT</h2>
+  <button id="googleSignIn">Sign in with Google</button>
 
-  <script>
-    // Check if user already entered WhatsApp number
-    const savedNumber = localStorage.getItem('whatsapp');
-    if (savedNumber) {
-      // If already saved, go to dashboard
-      window.location.href = "dashboard.html";
-    }
+  <form id="whatsappForm">
+    <input type="text" id="whatsapp" placeholder="Enter WhatsApp number" required>
+    <button type="submit">Continue to Dashboard</button>
+  </form>
+</div>
 
-    document.getElementById('signupForm').addEventListener('submit', function(e) {
-      e.preventDefault(); // Prevent default form submit
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
 
-      const whatsapp = document.getElementById('whatsapp').value.trim();
-      if (!whatsapp) {
-        alert("Please enter a WhatsApp number");
-        return;
-      }
+  // Google Sign-In
+  document.getElementById('googleSignIn').addEventListener('click', () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).then(result => {
+      const user = result.user;
+      const userRef = db.collection('users').doc(user.uid);
 
-      // Save WhatsApp number to localStorage (or replace with Firebase)
-      localStorage.setItem('whatsapp', whatsapp);
+      userRef.get().then(doc => {
+        if(doc.exists && doc.data().whatsapp){
+          // Existing user, go to dashboard
+          window.location.href = 'dashboard.html';
+        } else {
+          // New user, show WhatsApp input
+          document.getElementById('whatsappForm').style.display = 'block';
+        }
+      });
+    }).catch(err => console.error(err));
+  });
 
-      // Navigate to dashboard after saving
-      window.location.href = "dashboard.html";
-    });
-  </script>
+  // WhatsApp form submission
+  document.getElementById('whatsappForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const whatsapp = document.getElementById('whatsapp').value.trim();
+    if(!whatsapp) return alert('Enter WhatsApp number');
+
+    const user = auth.currentUser;
+    db.collection('users').doc(user.uid).set({
+      name: user.displayName,
+      email: user.email,
+      whatsapp: whatsapp,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      last_login: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).then(() => {
+      window.location.href = 'dashboard.html';
+    }).catch(err => console.error(err));
+  });
+</script>
 
 </body>
 </html>
