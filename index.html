@@ -2,160 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Expense Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile friendly -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Signup - Expense Tracker</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="firebase.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 15px; margin: 0; background: #f9f9f9; }
-    h2 { text-align: center; margin-bottom: 15px; }
-    input, button { padding: 10px; margin: 8px 0; width: 100%; max-width: 400px; }
-    button { background: #007BFF; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    button:hover { background: #0056b3; }
-    nav { text-align: center; margin-bottom: 20px; }
-    nav button { width: auto; margin: 5px; padding: 10px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; background: white; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
-    th { background: #007BFF; color: white; }
-    .delete-btn { background: red; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
-    .summary-box { background: white; padding: 15px; margin-top: 20px; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    #warning { color: red; font-weight: bold; margin-top: 10px; }
-    @media (max-width: 600px) {
-      table, th, td { font-size: 12px; }
-    }
+    body { font-family: Poppins, sans-serif; text-align: center; padding: 30px; background: #f9fafc; }
+    .container { background: white; padding: 25px; border-radius: 12px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    input, button { padding: 10px; width: 90%; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+    button { background: #4285f4; color: white; cursor: pointer; font-weight: bold; }
+    h2 { color: #333; }
   </style>
 </head>
 <body>
-  <h2>Expense Tracker Dashboard</h2>
-
-  <!-- Navigation -->
-  <nav>
-    <button onclick="location.href='index.html'">Home</button>
-    <button onclick="location.href='summary.html'">Monthly Summary</button>
-  </nav>
-
-  <p>Enter your WhatsApp number (without +94, e.g., 77xxxxxxx):</p>
-  <input type="text" id="userId" placeholder="77xxxxxxx" oninput="saveUserId()">
-  <button onclick="loadData()">View My Expenses</button>
-
-  <h3>Your Expenses</h3>
-  <table id="expenseTable">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Description</th>
-        <th>Amount</th>
-        <th>Type</th>
-        <th>Category</th>
-        <th>Paid From</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <!-- Monthly total + warning -->
-  <div class="summary-box">
-    <h3>This Month’s Total: <span id="monthlyTotal">0</span></h3>
-    <div id="warning"></div>
+  <div class="container">
+    <h2>Expense Tracker</h2>
+    <button id="googleSignInBtn">Sign in with Google</button>
+    <div id="whatsappSection" style="display:none;">
+      <p>Enter your WhatsApp number (without +94):</p>
+      <input type="text" id="whatsappInput" placeholder="77xxxxxxx">
+      <button id="saveNumberBtn">Save & Continue</button>
+    </div>
   </div>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCVBouas1jAvQvpRMv7mlqKTjCu0HRTYRk",
-      authDomain: "expensetrackermvp-fdfd1.firebaseapp.com",
-      projectId: "expensetrackermvp-fdfd1"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const MAX_BUDGET = 100000;
+    const provider = new firebase.auth.GoogleAuthProvider();
+    document.getElementById("googleSignInBtn").addEventListener("click", async () => {
+      try {
+        const result = await auth.signInWithPopup(provider);
+        console.log(result.user);
+        document.getElementById("whatsappSection").style.display = "block";
+      } catch (err) {
+        alert(err.message);
+      }
+    });
 
-    async function saveUserId() {
-    const userIdInput = document.getElementById("userId").value.trim();
-    if (userIdInput.match(/^[0-9]{9}$/)) {
-      const userId = "whatsapp:+94" + userIdInput;
-      localStorage.setItem("userId", userId);
-    }
-  }
-  
-    async function loadData() {
-      let userIdInput = document.getElementById("userId").value.trim();
-      if (!userIdInput.match(/^[0-9]{9}$/)) {
-        alert("Please enter a valid WhatsApp number without +94 (e.g., 77xxxxxxx)");
-        return;
-      }
-      const userId = "whatsapp:+94" + userIdInput;
-      
-      // Save to localStorage for use in summary.html
-      localStorage.setItem("userId", userId);
-  
-      const tableBody = document.querySelector("#expenseTable tbody");
-      tableBody.innerHTML = "";
-  
-      try {
-        const snapshot = await db.collection("expenses")
-          .doc(userId)
-          .collection("entries")
-          .orderBy("date", "desc")
-          .get();
-  
-        if (snapshot.empty) {
-          alert("No entries found for this number");
-          return;
-        }
-  
-        let total = 0;
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-  
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const docId = doc.id;
-          let dateObj = data.date && data.date.toDate ? data.date.toDate() : new Date();
-  
-          // Count only current month expenses
-          if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear && data.type === "Expense") {
-            total += data.amount || 0;
-          }
-  
-          const row = `<tr>
-            <td>${dateObj.toLocaleDateString()}</td>
-            <td>${data.description || ""}</td>
-            <td>${data.amount || 0}</td>
-            <td>${data.type || ""}</td>
-            <td>${data.category || ""}</td>
-            <td>${data.paid_from || ""}</td>
-            <td><button class="delete-btn" onclick="deleteEntry('${userId}', '${docId}')">Delete</button></td>
-          </tr>`;
-          tableBody.insertAdjacentHTML("beforeend", row);
-        });
-  
-        // Update monthly total & warning
-        document.getElementById("monthlyTotal").innerText = total;
-        if (total > MAX_BUDGET) {
-          document.getElementById("warning").innerText = "⚠️ Warning: You have exceeded your monthly budget of " + MAX_BUDGET;
-        } else {
-          document.getElementById("warning").innerText = "";
-        }
-  
-      } catch (err) {
-        console.error(err);
-        alert("Error fetching data");
-      }
-    }
-  
-    async function deleteEntry(userId, docId) {
-      if (!confirm("Are you sure you want to delete this entry?")) return;
-      try {
-        await db.collection("expenses").doc(userId).collection("entries").doc(docId).delete();
-        alert("Entry deleted successfully");
-        loadData();
-      } catch (err) {
-        console.error(err);
-        alert("Failed to delete entry");
-      }
-    }
+    document.getElementById("saveNumberBtn").addEventListener("click", async () => {
+      const user = auth.currentUser;
+      const num = document.getElementById("whatsappInput").value.trim();
+      if (!user || !num) return alert("Please enter your WhatsApp number");
+      const formatted = "+94" + num.replace(/^0+/, "");
+      await db.collection("users").doc(formatted).set({
+        userId: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        createdAt: new Date()
+      });
+      alert("✅ WhatsApp number linked!");
+      localStorage.setItem("uid", user.uid);
+      localStorage.setItem("whatsapp", formatted);
+      window.location.href = "dashboard.html";
+    });
   </script>
-  
 </body>
 </html>
